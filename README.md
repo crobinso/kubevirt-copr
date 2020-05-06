@@ -1,4 +1,4 @@
-Helper script for building [kubevirt][https://github.com/kubevirt/kubevirt]
+Helper script for building [kubevirt](https://github.com/kubevirt/kubevirt)
 [copr](https://copr.fedorainfracloud.org/) repos, as seen here:
 
 https://copr.fedorainfracloud.org/groups/g/kubevirt/coprs/
