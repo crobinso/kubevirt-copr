@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+
+import argparse
+import logging
+import pprint
+import subprocess
+import sys
+import time
+
+import copr
+import requests
+
+
+log = logging.getLogger(__name__)
+
+
+# This is the list of dist-git packages in the repo
+PACKAGE_NAMES = [
+    "qemu",
+    "libvirt",
+]
+
+
+CHROOTS = [
+    "fedora-31-x86_64",
+    "fedora-31-aarch64",
+
+    "fedora-32-x86_64",
+    "fedora-32-aarch64",
+]
+
+
+#####################
+# Utility functions #
+#####################
+
+def delay(msg, secs):
+    for sec in range(secs):
+        newstr = "\r%s(%s of %s)" % (msg, sec + 1, secs)
+        sys.stdout.write(newstr)
+        sys.stdout.flush()
+        time.sleep(1)
+
+
+class Verrel:
+    """
+    Helper class for interacting with koji build names
+    """
+    def __init__(self, verrel):
+        self.full = verrel
+        (self.package,
+         self.version,
+         self.release) = self.full.split("-", 2)
+
+        # Project names have the .fcXX dist component stripped out
+        self.project_name = self.full.rsplit(".", 1)[0]
+
+    def get_srpm_url(self):
+        url = "https://kojipkgs.fedoraproject.org/packages/"
+        url += "%s/%s/%s/src/%s.src.rpm" % (
+                self.package, self.version, self.release, self.full)
+        requests.head(url).raise_for_status()
+        return url
+
+
+################
+# Copr helpers #
+################
+
+class CoprAPI:
+    """
+    Helper class for talking to copr API
+    """
+    OWNER = "@kubevirt"
+
+    def __init__(self):
+        self._client = copr.ClientV2.create_from_file_config()
+
+    def has_repo_for_build(self, verrel):
+        """
+        Check if a repo exists for the passed package version,
+        and that the repo has an in progress or successful build.
+        Meaning, we are already up to date and there's nothing to do
+        """
+        proj = self._lookup_project(verrel)
+        if not proj:
+            return False
+
+        for build in proj.get_builds():
+            if build.state == "running":
+                # Don't mess with any repo with 'running' builds
+                print("Builds are still running for proj=%s" % proj.name)
+                return True
+            if build.state == "success":
+                # Treat any successful build as a match. It's
+                # kinda hard to match against versions in copr because
+                # it publishes the epoch in the version string
+                return True
+
+        return False
+
+    def _cli_build(self, proj, srpmurl):
+        # We use the CLI here because it will wait for the build
+        # to complete and give nicer reporting
+        reponame = "%s/%s" % (self.OWNER, proj.name)
+        cmd = ["copr-cli", "build", reponame, srpmurl]
+
+        print("\n\n+ %s" % " ".join(cmd))
+        returncode = subprocess.call(cmd)
+        log.debug("copr-cli returned %s", returncode)
+        return bool(returncode == 0)
+
+    def _create_project(self, verrel):
+        proj = self._client.projects.create(
+                name=verrel.project_name,
+                owner=self.OWNER,
+                chroots=CHROOTS)
+        return proj
+
+    def _lookup_project(self, verrel):
+        projects = self._client.projects.get_list(
+                owner=self.OWNER, name=verrel.project_name)
+        return projects and projects[0] or None
+
+    def make_repo(self, verrel):
+        """
+        Make the copr project repo, and kick of a build
+        """
+        # Get SRPM URL
+        srpmurl = verrel.get_srpm_url()
+        log.debug("Using koji SRPM URL: %s", str(srpmurl))
+
+        # Lookup the project, or create it if it doesn't exist
+        proj = self._lookup_project(verrel)
+        if proj:
+            log.debug("Found existing project: %s", proj)
+        else:
+            self._create_project(verrel)
+            proj = self._lookup_project(verrel)
+            log.debug("Created project: %s", str(proj))
+
+        return self._cli_build(proj, srpmurl)
+
+
+####################
+# Helper functions #
+####################
+
+def get_koji_latest_verrels():
+    """
+    Query koji for the latest verrel build for rawhide of each
+        package in PACKAGE_NAMES
+
+    :returns: dict of package_name:verrel
+    """
+    verrels = []
+    for package_name in PACKAGE_NAMES:
+        cmd = ["koji", "latest-build", "--quiet", "rawhide", package_name]
+        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        verrelstr = out.split()[0].decode("utf-8")
+        verrel = Verrel(verrelstr)
+        verrels.append(verrel)
+
+    return verrels
+
+
+#########################
+# Main and CLI handling #
+#########################
+
+def parse_args():
+    desc = ("Helper for maintaining kubevirt copr repos."
+            "https://copr.fedorainfracloud.org/groups/g/kubevirt/coprs/")
+    parser = argparse.ArgumentParser(description=desc)
+
+    parser.add_argument("-d", "--debug", action="store_true",
+            help="Debug output")
+
+    return parser.parse_args()
+
+
+def setup_logging(debug):
+    global logging
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(
+        "[%(asctime)s] %(levelname)s (%(module)s:%(lineno)d) %(message)s",
+        "%H:%M:%S"))
+    log.addHandler(handler)
+    log.setLevel(debug and logging.DEBUG or logging.ERROR)
+    del(logging)
+
+
+def build_packages():
+    coprapi = CoprAPI()
+
+    print("Checking koji for latest rawhide verrels...")
+    koji_verrels = get_koji_latest_verrels()
+    log.debug("Koji verrels:\n%s", pprint.pformat(
+        [v.full for v in koji_verrels]))
+
+    # Determine if these are new builds
+    need_repos = []
+    for verrel in koji_verrels:
+        if not coprapi.has_repo_for_build(verrel):
+            need_repos.append(verrel)
+
+    if not need_repos:
+        print("Everything is up to date, nothing to build")
+        return
+
+    need_repos.sort(key=lambda v: v.full)
+    print("\nThe following packages need publishing:\n")
+    for verrel in need_repos:
+        print("* %s" % verrel.full)
+
+    print()
+    delay("Proceeding, ctrl-c to exit...", 5)
+    print()
+
+    failures = []
+    for verrel in need_repos:
+        build_success = coprapi.make_repo(verrel)
+        if not build_success:
+            failures.append(verrel.full)
+
+    if failures:
+        print("\n\nTHE FOLLOWING BUILDS FAILED: %s" % failures)
+        return True
+
+
+def main():
+    options = parse_args()
+    setup_logging(options.debug)
+
+    if build_packages():
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
