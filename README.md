@@ -16,3 +16,5 @@ The way this script works:
 * Rebuilds each build into its own copr project, using all stable Fedora releases as the target chroots
 
 All new builds are made available for multiple Fedora stable releases, and kubevirt devs are free to mix and match qemu+libvirt version match as needed, via the individual copr projects.
+
+Admin rights on the copr kubevirt group are tracked by the [kubevirt pkgdb group](https://admin.fedoraproject.org/accounts/group/view/kubevirt)
