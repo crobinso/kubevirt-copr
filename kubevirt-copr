@@ -62,6 +62,9 @@ class Verrel:
         requests.head(url).raise_for_status()
         return url
 
+    def __repr__(self):
+        return "<%s %s>" % (self.__class__.__name__, self.full)
+
 
 ################
 # Copr helpers #
@@ -83,6 +86,7 @@ class CoprAPI:
         Meaning, we are already up to date and there's nothing to do
         """
         proj = self._lookup_project(verrel)
+        log.debug("Found proj=%s for verrel=%s", proj, verrel)
         if not proj:
             return False
 
@@ -95,8 +99,10 @@ class CoprAPI:
                 # Treat any successful build as a match. It's
                 # kinda hard to match against versions in copr because
                 # it publishes the epoch in the version string
+                log.debug("Found successful build for verrel=%s", verrel)
                 return True
 
+        log.debug("No build found for verrel=%s", verrel)
         return False
 
     def _cli_build(self, proj, srpmurl):
