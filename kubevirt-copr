@@ -95,7 +95,7 @@ class CoprAPI:
                 # Don't mess with any repo with 'running' builds
                 print("Builds are still running for proj=%s" % proj.name)
                 return True
-            if build.state == "success":
+            if build.state == "succeeded":
                 # Treat any successful build as a match. It's
                 # kinda hard to match against versions in copr because
                 # it publishes the epoch in the version string
