@@ -117,6 +117,9 @@ class CoprAPI:
         return bool(returncode == 0)
 
     def _create_project(self, verrel):
+        print("Creating new copr project %s/%s\n" %
+                (self.OWNER, verrel.project_name))
+
         proj = self._client.projects.create(
                 name=verrel.project_name,
                 owner=self.OWNER,
