@@ -185,6 +185,9 @@ def parse_args():
 
     parser.add_argument("-d", "--debug", action="store_true",
             help="Debug output")
+    parser.add_argument("--build", metavar="VERREL", action="append",
+            help="Force a build for the specified package version"
+                 "Example: --build=libvirt-6.1.0-1.fc33")
 
     return parser.parse_args()
 
@@ -200,19 +203,23 @@ def setup_logging(debug):
     del(logging)
 
 
-def build_packages():
+def build_packages(manual_builds):
     coprapi = CoprAPI()
 
-    print("Checking koji for latest rawhide verrels...")
-    koji_verrels = get_koji_latest_verrels()
-    log.debug("Koji verrels:\n%s", pprint.pformat(
-        [v.full for v in koji_verrels]))
-
-    # Determine if these are new builds
     need_repos = []
-    for verrel in koji_verrels:
-        if not coprapi.has_repo_for_build(verrel):
-            need_repos.append(verrel)
+    if manual_builds:
+        # Manual builds requested via --build
+        need_repos = [Verrel(b) for b in manual_builds]
+    else:
+        print("Checking koji for latest rawhide verrels...")
+        koji_verrels = get_koji_latest_verrels()
+        log.debug("Koji verrels:\n%s", pprint.pformat(
+            [v.full for v in koji_verrels]))
+
+        # Determine if these are new builds
+        for verrel in koji_verrels:
+            if not coprapi.has_repo_for_build(verrel):
+                need_repos.append(verrel)
 
     if not need_repos:
         print("Everything is up to date, nothing to build")
@@ -242,7 +249,7 @@ def main():
     options = parse_args()
     setup_logging(options.debug)
 
-    if build_packages():
+    if build_packages(options.build):
         return 1
     return 0
 

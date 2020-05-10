@@ -18,3 +18,5 @@ The way this script works:
 All new builds are made available for multiple Fedora stable releases, and kubevirt devs are free to mix and match qemu+libvirt version match as needed, via the individual copr projects.
 
 Admin rights on the copr kubevirt group are tracked by the [kubevirt pkgdb group](https://admin.fedoraproject.org/accounts/group/view/kubevirt)
+
+Manual builds can be initiated like `./kubevirt-copr --build=libvirt-6.1.0-1.fc33`
