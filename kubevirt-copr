@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-import copr
+import copr.v3
 import requests
 
 
@@ -74,10 +74,10 @@ class CoprAPI:
     """
     Helper class for talking to copr API
     """
-    OWNER = "@kubevirt"
+    OWNER_NAME = "@kubevirt"
 
     def __init__(self):
-        self._client = copr.ClientV2.create_from_file_config()
+        self._client = copr.v3.Client.create_from_config_file()
 
     def has_repo_for_build(self, verrel):
         """
@@ -90,12 +90,15 @@ class CoprAPI:
         if not proj:
             return False
 
-        for build in proj.get_builds():
-            if build.state == "running":
+        builds = self._client.build_proxy.get_list(
+                ownername=self.OWNER_NAME,
+                projectname=verrel.project_name)
+        for build in builds:
+            if build["state"] == "running":
                 # Don't mess with any repo with 'running' builds
                 print("Builds are still running for proj=%s" % proj.name)
                 return True
-            if build.state == "succeeded":
+            if build["state"] == "succeeded":
                 # Treat any successful build as a match. It's
                 # kinda hard to match against versions in copr because
                 # it publishes the epoch in the version string
@@ -105,10 +108,10 @@ class CoprAPI:
         log.debug("No build found for verrel=%s", verrel)
         return False
 
-    def _cli_build(self, proj, srpmurl):
+    def _cli_build(self, projectname, srpmurl):
         # We use the CLI here because it will wait for the build
         # to complete and give nicer reporting
-        reponame = "%s/%s" % (self.OWNER, proj.name)
+        reponame = "%s/%s" % (self.OWNER_NAME, projectname)
         cmd = ["copr-cli", "build", reponame, srpmurl]
 
         print("\n\n+ %s" % " ".join(cmd))
@@ -118,18 +121,21 @@ class CoprAPI:
 
     def _create_project(self, verrel):
         print("Creating new copr project %s/%s\n" %
-                (self.OWNER, verrel.project_name))
+                (self.OWNER_NAME, verrel.project_name))
 
-        proj = self._client.projects.create(
-                name=verrel.project_name,
-                owner=self.OWNER,
-                chroots=CHROOTS)
-        return proj
+        self._client.project_proxy.add(
+            ownername=self.OWNER_NAME,
+            projectname=verrel.project_name,
+            chroots=CHROOTS)
 
     def _lookup_project(self, verrel):
-        projects = self._client.projects.get_list(
-                owner=self.OWNER, name=verrel.project_name)
-        return projects and projects[0] or None
+        try:
+            self._client.project_proxy.get(
+                    ownername=self.OWNER_NAME,
+                    projectname=verrel.project_name)
+        except copr.v3.exceptions.CoprNoResultException:
+            return None
+        return verrel.project_name
 
     def make_repo(self, verrel):
         """
@@ -140,15 +146,15 @@ class CoprAPI:
         log.debug("Using koji SRPM URL: %s", str(srpmurl))
 
         # Lookup the project, or create it if it doesn't exist
-        proj = self._lookup_project(verrel)
-        if proj:
-            log.debug("Found existing project: %s", proj)
+        projectname = self._lookup_project(verrel)
+        if projectname:
+            log.debug("Found existing project: %s", projectname)
         else:
             self._create_project(verrel)
-            proj = self._lookup_project(verrel)
-            log.debug("Created project: %s", str(proj))
+            projectname = self._lookup_project(verrel)
+            log.debug("Created project: %s", projectname)
 
-        return self._cli_build(proj, srpmurl)
+        return self._cli_build(projectname, srpmurl)
 
 
 ####################
