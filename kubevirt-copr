@@ -23,7 +23,8 @@ PACKAGE_NAMES = [
 
 CHROOTS = [
     "fedora-31-x86_64",
-    "fedora-31-aarch64",
+    # 2020-08-05: qemu builds have been failing, looks like OOM
+    #"fedora-31-aarch64",
 
     "fedora-32-x86_64",
     "fedora-32-aarch64",
