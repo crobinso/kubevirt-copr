@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+  - cron: "0 0 * * *" # Run every day at midnight
+
+jobs:
+  # Setup latest Fedora with latest libvirt from virt-preview, build
+  # the RPM, verify it installs, run test suite, upload coverage
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: aintdiscole/fedora-copr:latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run nightly check
+      env:
+          COPR_CONFIG_CONTENT: ${{ secrets.COPR_CONFIG_CONTENT }}
+      run: |
+        mkdir $HOME/.config
+        echo "$COPR_CONFIG_CONTENT" > $HOME/.config/copr
+        ./kubevirt-copr

@@ -1,3 +1,5 @@
+[![Actions Status](https://github.com/crobinso/kubevirt-copr/workflows/CI/badge.svg)](https://github.com/crobinso/kubevirt-copr/actions)
+
 Helper script for building [kubevirt](https://github.com/kubevirt/kubevirt)
 [copr](https://copr.fedorainfracloud.org/) repos, as seen here:
 
@@ -11,7 +13,7 @@ The consumer here is kubevirt's [libvirt image](https://github.com/kubevirt/libv
 
 The way this script works:
 
-* Runs nightly via cron on my local machine
+* Runs nightly via GitHub Actions CI
 * Checks [Fedora koji](https://koji.fedoraproject.org/koji/) build system for any new libvirt and qemu builds completed against rawhide.
 * Rebuilds each build into its own copr project, using all stable Fedora releases as the target chroots
 
