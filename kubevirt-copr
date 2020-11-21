@@ -18,6 +18,9 @@ log = logging.getLogger(__name__)
 PACKAGE_NAMES = [
     "qemu",
     "libvirt",
+    "seabios",
+    "SLOF",
+    "edk2",
 ]
 
 
