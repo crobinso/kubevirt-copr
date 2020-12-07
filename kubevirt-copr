@@ -55,7 +55,7 @@ class Verrel:
          self.release) = self.full.split("-", 2)
 
         # Project names have the .fcXX dist component stripped out
-        self.project_name = self.full.rsplit(".", 1)[0]
+        self.project_name = self.full.rsplit(".fc", 1)[0]
 
     def get_srpm_url(self):
         url = "https://kojipkgs.fedoraproject.org/packages/"
