@@ -98,7 +98,8 @@ class CoprAPI:
         for build in builds:
             if build["state"] == "running":
                 # Don't mess with any repo with 'running' builds
-                print("Builds are still running for proj=%s" % proj.name)
+                print("Builds are still running for proj=%s" %
+                        verrel.project_name)
                 return True
             if build["state"] == "succeeded":
                 # Treat any successful build as a match. It's
