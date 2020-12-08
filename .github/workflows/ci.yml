@@ -9,7 +9,7 @@ on:
 jobs:
   # Setup latest Fedora with latest libvirt from virt-preview, build
   # the RPM, verify it installs, run test suite, upload coverage
-  test:
+  update-copr:
     runs-on: ubuntu-latest
     container:
       image: aintdiscole/fedora-copr:latest
@@ -24,3 +24,47 @@ jobs:
         mkdir $HOME/.config
         echo "$COPR_CONFIG_CONTENT" > $HOME/.config/copr
         ./kubevirt-copr
+
+  # The update-copr job runs in a Fedora container, because it
+  # uses fedpkg and the copr library which are available in distro
+  # repos. But this step which is doing docker builds is easier
+  # to run on the parent ubuntu VM, hence the split.
+  update-container:
+    needs: update-copr
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+
+    - name: Install python deps
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Generate latest copr package list
+      run: |
+        ./latest-copr-versions.py
+        cat container_versions
+
+    - name: Build local kubevirt/libvirt container
+      run: |
+        git clone https://github.com/kubevirt/libvirt
+        source container_versions
+        cd libvirt
+        ./hack/prepare.sh
+        ./hack/simple-build.sh
+    - name: push container
+      env:
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+      run: |
+        cd libvirt
+        DATE=$(date +"%Y%m%d-%H%M%S")
+        DOCKER_USERNAME="aintdiscole"
+        IMAGE_NAME="$DOCKER_USERNAME/kubevirt-libvirt"
+        TAG="$IMAGE_NAME:$DATE"
+        LATEST_TAG="$IMAGE_NAME:latest"
+        docker build --tag "$TAG" --tag "$LATEST_TAG" .
+        docker login -u "$DOCKER_USERNAME" -p "$DOCKER_TOKEN"
+        docker push "$TAG"
+        docker push "$LATEST_TAG"
