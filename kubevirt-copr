@@ -49,6 +49,17 @@ class Verrel:
     Helper class for interacting with koji build names
     """
     def __init__(self, verrel):
+        # Some versions are like XXX.fcXX.1
+        # The .1 typically means a rebuild, no code change so
+        # is generally not worth publishing.
+        # Processing those style of versions makes a few things
+        # difficult, so completely disregard them if we see them,
+        # and use the plain .fcXX version instead
+        if not verrel.split(".")[-1].startswith("fc"):
+            newverrel = ".".join(verrel.split(".")[:-1])
+            log.debug("Converting verrel=%s to %s", verrel, newverrel)
+            verrel = newverrel
+
         self.full = verrel
         (self.package,
          self.version,
