@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import os
 import pprint
 import subprocess
 import sys
@@ -16,9 +17,9 @@ log = logging.getLogger(__name__)
 
 # This is the list of dist-git packages in the repo
 PACKAGE_NAMES = [
-    "qemu",
-    "libvirt",
     "seabios",
+    "libvirt",
+    "qemu",
     "SLOF",
     "edk2",
 ]
@@ -79,6 +80,17 @@ class Verrel:
 
     def __repr__(self):
         return "<%s %s>" % (self.__class__.__name__, self.full)
+
+
+class SRPMVerrel(Verrel):
+    def __init__(self, srpmpath):
+        self.srpmpath = srpmpath
+        assert os.path.exists(srpmpath)
+        assert srpmpath.endswith(".src.rpm")
+        super().__init__(".".join(os.path.basename(srpmpath).split(".")[:-2]))
+
+    def get_srpm_url(self):
+        return self.srpmpath
 
 
 ################
@@ -210,6 +222,7 @@ def parse_args():
     parser.add_argument("--build", metavar="VERREL", action="append",
             help="Force a build for the specified package version"
                  "Example: --build=libvirt-6.1.0-1.fc33")
+    parser.add_argument("--srpm", help="Build the passed srpm")
 
     return parser.parse_args()
 
@@ -225,11 +238,13 @@ def setup_logging(debug):
     del(logging)
 
 
-def build_packages(manual_builds):
+def build_packages(manual_builds, srpm):
     coprapi = CoprAPI()
 
     need_repos = []
-    if manual_builds:
+    if srpm:
+        need_repos = [SRPMVerrel(srpm)]
+    elif manual_builds:
         # Manual builds requested via --build
         need_repos = [Verrel(b) for b in manual_builds]
     else:
@@ -271,7 +286,7 @@ def main():
     options = parse_args()
     setup_logging(options.debug)
 
-    if build_packages(options.build):
+    if build_packages(options.build, options.srpm):
         return 1
     return 0
 
