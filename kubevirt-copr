@@ -65,8 +65,9 @@ class Verrel:
          self.version,
          self.release) = self.full.split("-", 2)
 
-        # Project names have the .fcXX dist component stripped out
-        self.project_name = self.full.rsplit(".fc", 1)[0]
+        # We used to strip out the .fc bit, but that can make it ambiguous
+        # what content we are mirroring
+        self.project_name = self.full
 
     def get_srpm_url(self):
         url = "https://kojipkgs.fedoraproject.org/packages/"
