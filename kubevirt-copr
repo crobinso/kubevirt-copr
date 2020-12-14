@@ -55,7 +55,8 @@ class Verrel:
         # Processing those style of versions makes a few things
         # difficult, so completely disregard them if we see them,
         # and use the plain .fcXX version instead
-        if not verrel.split(".")[-1].startswith("fc"):
+        suffix = verrel.split(".")[-1]
+        if not suffix.startswith("fc") and not suffix.startswith("el"):
             newverrel = ".".join(verrel.split(".")[:-1])
             log.debug("Converting verrel=%s to %s", verrel, newverrel)
             verrel = newverrel
