@@ -23,8 +23,12 @@ def natural_sort(lst):
 
 def find_latest(projname):
     names = [n for n in ALL_PROJECT_NAMES if n.startswith(projname)]
-    verrel = natural_sort(names)[-1]
-    return verrel.split("-", 1)[1]
+    for verrel in reversed(natural_sort(names)):
+        if ".el" in verrel:
+            # Ignore any RHEL rebuilds. We always want to use Fedora builds
+            # for this container
+            continue
+        return verrel.split("-", 1)[1]
 
 
 out = ""
