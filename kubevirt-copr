@@ -71,6 +71,10 @@ class Verrel:
         # what content we are mirroring
         self.project_name = self.full
 
+        # The QEMU source package is 'qemu' in Fedora and 'qemu-kvm' in
+        # RHEL. Make things consistent by always using the former
+        self.project_name = self.project_name.replace("qemu-kvm", "qemu")
+
     def get_srpm_url(self):
         url = "https://kojipkgs.fedoraproject.org/packages/"
         url += "%s/%s/%s/src/%s.src.rpm" % (
