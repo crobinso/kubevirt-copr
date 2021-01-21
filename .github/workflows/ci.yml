@@ -30,6 +30,9 @@ jobs:
   # to run on the parent ubuntu VM, hence the split.
   update-container:
     needs: update-copr
+    # Skip the job. kubevirt/libvirt is dead now, this needed to
+    # be adapted to kubevirt.git (or thrown out entirely)
+    if: false  # always skip job
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
