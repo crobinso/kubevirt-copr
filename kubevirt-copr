@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import pprint
+import re
 import subprocess
 import sys
 import time
@@ -35,6 +36,15 @@ CHROOTS = [
 ]
 
 
+# Mapping of package_name:regex for packages to exclude per chroot.
+# Otherwise copr doesn't take Exc*Arch into account and will report
+# build failure
+EXCLUDE_ARCH = {
+    # edk2 ExclusiveArch skips some arches
+    "edk2": [".*ppc64.*", ".*s390.*"],
+}
+
+
 #####################
 # Utility functions #
 #####################
@@ -45,6 +55,18 @@ def delay(msg, secs):
         sys.stdout.write(newstr)
         sys.stdout.flush()
         time.sleep(1)
+
+
+def package_skip_chroot(package_name, chroot_name):
+    """
+    Return True if we shouldn't build `package_name` for `chroot_name` per
+    `EXCLUDE_ARCH` mappings
+    """
+    skip_regexs = EXCLUDE_ARCH.get(package_name, [])
+    for regex in skip_regexs:
+        if re.match(regex, chroot_name):
+            return True
+    return False
 
 
 class Verrel:
@@ -157,10 +179,16 @@ class CoprAPI:
         print("Creating new copr project %s/%s\n" %
                 (self.OWNER_NAME, verrel.project_name))
 
+        chroots = []
+        for chroot in CHROOTS:
+            if package_skip_chroot(verrel.package, chroot):
+                continue
+            chroots.append(chroot)
+
         self._client.project_proxy.add(
             ownername=self.OWNER_NAME,
             projectname=verrel.project_name,
-            chroots=CHROOTS)
+            chroots=chroots)
 
     def _lookup_project(self, verrel):
         try:
