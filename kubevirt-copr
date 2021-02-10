@@ -29,10 +29,13 @@ PACKAGE_NAMES = [
 CHROOTS = [
     "fedora-32-x86_64",
     "fedora-32-aarch64",
-    "fedora-32-s390x",
     "fedora-33-x86_64",
     "fedora-33-aarch64",
-    "fedora-33-s390x",
+    # emulated s390x builds fail in the qemu test suite
+    # they also take over 24 hours to complete.
+    # Disable for now
+    #"fedora-32-s390x",
+    #"fedora-33-s390x",
 ]
 
 
