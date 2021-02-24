@@ -31,6 +31,8 @@ CHROOTS = [
     "fedora-32-aarch64",
     "fedora-33-x86_64",
     "fedora-33-aarch64",
+    "centos-stream-x86_64",
+    "centos-stream-aarch64",
     # emulated s390x builds fail in the qemu test suite
     # they also take over 24 hours to complete.
     # Disable for now
