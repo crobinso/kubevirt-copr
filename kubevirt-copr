@@ -46,7 +46,10 @@ CHROOTS = [
 # build failure
 EXCLUDE_ARCH = {
     # edk2 ExclusiveArch skips some arches
-    "edk2": [".*ppc64.*", ".*s390.*"],
+    # rom builds need cross-gcc which isn't in centos/EPEL
+    "edk2": [".*ppc64.*", ".*s390.*", ".*centos-stream.*"],
+    "SLOF": [".*centos-stream.*"],
+    "seabios": [".*centos-stream.*"],
 }
 
 
