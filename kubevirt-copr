@@ -137,9 +137,8 @@ class CoprAPI:
     """
     Helper class for talking to copr API
     """
-    OWNER_NAME = "@kubevirt"
-
-    def __init__(self):
+    def __init__(self, owner):
+        self._owner = owner
         self._client = copr.v3.Client.create_from_config_file()
 
     def has_repo_for_build(self, verrel):
@@ -154,7 +153,7 @@ class CoprAPI:
             return False
 
         builds = self._client.build_proxy.get_list(
-                ownername=self.OWNER_NAME,
+                ownername=self._owner,
                 projectname=verrel.project_name)
         for build in builds:
             if build["state"] == "running":
@@ -175,7 +174,7 @@ class CoprAPI:
     def _cli_build(self, projectname, srpmurl):
         # We use the CLI here because it will wait for the build
         # to complete and give nicer reporting
-        reponame = "%s/%s" % (self.OWNER_NAME, projectname)
+        reponame = "%s/%s" % (self._owner, projectname)
         cmd = ["copr-cli", "build", reponame, srpmurl]
 
         print("\n\n+ %s" % " ".join(cmd))
@@ -185,7 +184,7 @@ class CoprAPI:
 
     def _create_project(self, verrel):
         print("Creating new copr project %s/%s\n" %
-                (self.OWNER_NAME, verrel.project_name))
+                (self._owner, verrel.project_name))
 
         chroots = []
         for chroot in CHROOTS:
@@ -194,14 +193,14 @@ class CoprAPI:
             chroots.append(chroot)
 
         self._client.project_proxy.add(
-            ownername=self.OWNER_NAME,
+            ownername=self._owner,
             projectname=verrel.project_name,
             chroots=chroots)
 
     def _lookup_project(self, verrel):
         try:
             self._client.project_proxy.get(
-                    ownername=self.OWNER_NAME,
+                    ownername=self._owner,
                     projectname=verrel.project_name)
         except copr.v3.exceptions.CoprNoResultException:
             return None
@@ -261,6 +260,8 @@ def parse_args():
 
     parser.add_argument("-d", "--debug", action="store_true",
             help="Debug output")
+    parser.add_argument("--owner", default="@kubevirt",
+            help="Owner for the newly created repo")
     parser.add_argument("--build", metavar="VERREL", action="append",
             help="Force a build for the specified package version"
                  "Example: --build=libvirt-6.1.0-1.fc33")
@@ -280,8 +281,8 @@ def setup_logging(debug):
     del(logging)
 
 
-def build_packages(manual_builds, srpm):
-    coprapi = CoprAPI()
+def build_packages(owner, manual_builds, srpm):
+    coprapi = CoprAPI(owner)
 
     need_repos = []
     if srpm:
@@ -307,7 +308,7 @@ def build_packages(manual_builds, srpm):
     need_repos.sort(key=lambda v: v.full)
     print("\nThe following packages need publishing:\n")
     for verrel in need_repos:
-        print("* %s" % verrel.full)
+        print("* %s/%s" % (owner, verrel.full))
 
     print()
     delay("Proceeding, ctrl-c to exit...", 5)
@@ -328,7 +329,7 @@ def main():
     options = parse_args()
     setup_logging(options.debug)
 
-    if build_packages(options.build, options.srpm):
+    if build_packages(options.owner, options.build, options.srpm):
         return 1
     return 0
 
